@@ -1,13 +1,27 @@
-import discord
 from discord.ext import commands
 from datetime import datetime
+from utils.database import cluster
 
 
-class Test(commands.Cog):
+def updateXp(user, guildId, value):
+    db = cluster[str(guildId)]
+    col = db["UserData"]
+
+    col.update({
+        "_id": user.id,
+        "name": user.name
+    }, {
+        '$inc': {"xp": value}
+    },
+        upsert=True)
+
+    print(col.find_one({"_id": user.id}))
+
+
+class CommandEvents(commands.Cog):
     def __init__(self, client):
         self.client = client
 
-    # Events
     @commands.Cog.listener()
     async def on_ready(self):
         print(f"Listening... {self.client.user}")
@@ -21,11 +35,15 @@ class Test(commands.Cog):
                 servidor=before.channel.guild if after.channel is None else after.channel.guild,
                 hora=datetime.now().strftime("%H:%M:%S")))
 
-    # Commands
-    @commands.command()
-    async def hello(self, ctx):
-        await ctx.send("Hello")
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        ctx = await self.client.get_context(message)
+        if ctx.valid:
+            return
+        else:
+            if message.author.id != self.client.user.id:
+                updateXp(message.author, message.guild.id, 10)
 
 
 def setup(client):
-    client.add_cog(Test(client))
+    client.add_cog(CommandEvents(client))
